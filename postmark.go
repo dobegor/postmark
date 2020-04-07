@@ -4,13 +4,16 @@ package postmark
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/http/httputil"
 )
 
 var (
-	postmarkURL = `https://api.postmarkapp.com`
+	ResponseDecodeError = errors.New("failed to decode Postmark's response")
+	postmarkURL         = `https://api.postmarkapp.com`
 )
 
 // Client provides a connection to the Postmark API
@@ -86,13 +89,21 @@ func (client *Client) doRequest(opts parameters, dst interface{}) error {
 		return err
 	}
 
+	dump, _ := httputil.DumpResponse(res, true)
+
 	defer res.Body.Close()
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		return err
 	}
+
 	err = json.Unmarshal(body, dst)
-	return err
+
+	if err != nil {
+		return fmt.Errorf("%w: payload: %s", ResponseDecodeError, string(dump))
+	}
+
+	return nil
 }
 
 // APIError represents errors returned by Postmark
